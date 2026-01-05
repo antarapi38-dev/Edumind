@@ -205,8 +205,8 @@ const App: React.FC = () => {
                 <span className="w-1 h-1 bg-slate-300 rounded-full mx-1"></span>
                 Ready to help
               </span>
-            </div >
-          </div >
+            </div>
+          </div>
         ) : (
           <div className="flex flex-col gap-4 mb-24 w-full">
             {/* Added mb-24 to prevent overlap with fixed input */}
@@ -227,29 +227,27 @@ const App: React.FC = () => {
         )}
 
         {/* Subject Grid - Only show when no messages */}
-        {
-          messages.length === 0 && (
-            <div className="w-full max-w-5xl mb-8 -mt-4">
-              <div className="bg-card-light dark:bg-card-dark rounded-[2.5rem] p-4 md:p-6 shadow-xl shadow-slate-200/60 dark:shadow-none border border-slate-100 dark:border-slate-700">
-                <h3 className="text-lg md:text-xl font-extrabold text-slate-700 dark:text-slate-200 mb-4 text-center">Pilih mata pelajaranmu!</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 w-full justify-items-center">
-                  {Object.values(Subject).map((subj) => (
-                    <button
-                      key={subj}
-                      onClick={() => handleSubjectSelect(subj)}
-                      className={`w-full flex flex-col items-center justify-center p-3 md:p-4 rounded-3xl font-bold shrink-0 transition-all border 
+        {messages.length === 0 && (
+          <div className="w-full max-w-5xl mb-8 -mt-4">
+            <div className="bg-card-light dark:bg-card-dark rounded-[2.5rem] p-4 md:p-6 shadow-xl shadow-slate-200/60 dark:shadow-none border border-slate-100 dark:border-slate-700">
+              <h3 className="text-lg md:text-xl font-extrabold text-slate-700 dark:text-slate-200 mb-4 text-center">Pilih mata pelajaranmu!</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 justify-items-center">
+                {Object.values(Subject).map((subj) => (
+                  <button
+                    key={subj}
+                    onClick={() => handleSubjectSelect(subj)}
+                    className={`w-full flex flex-col items-center justify-center p-3 md:p-4 rounded-3xl font-bold shrink-0 transition-all border 
                         ${subject === subj ? (subjectActiveStyles[subj] + ' shadow-md ring-2') : 'bg-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-700 border-transparent hover:border-slate-200'}
                         `}
-                    >
-                      <span className={`material-symbols-rounded text-3xl md:text-4xl mb-1 ${subject === subj ? '' : (subjectColors[subj] || 'group-hover:text-blue-500') + ' transition-colors'}`}>{subjectIcons[subj] || 'school'}</span>
-                      <span className="text-base md:text-lg">{subj}</span>
-                    </button>
-                  ))}
-                </div>
+                  >
+                    <span className={`material-symbols-rounded text-3xl md:text-4xl mb-1 ${subject === subj ? '' : (subjectColors[subj] || 'group-hover:text-blue-500') + ' transition-colors'}`}>{subjectIcons[subj] || 'school'}</span>
+                    <span className="text-base md:text-lg">{subj}</span>
+                  </button>
+                ))}
               </div>
             </div>
-          )
-        }
+          </div>
+        )}
 
         {/* Input Area - Sticky Bottom */}
         <div className={`w-full max-w-5xl ${messages.length > 0 ? 'fixed bottom-4 left-1/2 transform -translate-x-1/2 px-4' : 'mt-auto'} z-20`}>
@@ -290,7 +288,7 @@ const App: React.FC = () => {
             <p className="text-[0.7rem] text-slate-400 dark:text-slate-600 font-bold uppercase tracking-widest opacity-70">Powered by EduMind Intelligence</p>
           </div>
         </div>
-      </main >
+      </main>
     </>
   );
 };
