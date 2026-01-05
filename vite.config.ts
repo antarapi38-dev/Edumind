@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
     define: {
       'process.env.API_KEY': JSON.stringify("AIzaSyBrnpybfgOa2ZkyACpBXPQUl5M4iw3GDH8"),
       'process.env.GEMINI_API_KEY': JSON.stringify("AIzaSyBrnpybfgOa2ZkyACpBXPQUl5M4iw3GDH8"),
-      'process.env.OPENROUTER_API_KEY': JSON.stringify("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")
+      'process.env.OPENROUTER_API_KEY': JSON.stringify("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")
     },
     resolve: {
       alias: {
