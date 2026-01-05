@@ -1,68 +1,72 @@
+/// <reference types="vite/client" />
+import OpenAI from "openai";
 import { Subject } from "../types";
 
-// MOCKED SERVICE - Returns dummy data as requested
-const DUMMY_RESPONSE = `Hukum Newton! Yuk, kita bahas dengan cara yang santai dan seru 🎉
+// @ts-ignore
+const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY || "";
 
-🟢 Hukum Newton I – Hukum Kelembaman
+const client = new OpenAI({
+    baseURL: "https://openrouter.ai/api/v1",
+    apiKey: apiKey,
+    dangerouslyAllowBrowser: true // Client-side usage
+});
 
-“Kalau nggak diganggu, ya tetap begitu.”
-
-Benda yang diam akan tetap diam, dan benda yang bergerak akan terus bergerak lurus dengan kecepatan yang sama, kecuali ada gaya yang memengaruhinya.
-
-✨ Contoh gampang:
-
-Bola yang diam di lantai nggak akan bergerak kalau nggak ditendang ⚽
-
-Penumpang terasa terdorong ke depan saat mobil direm mendadak 🚗💨
-
-🔵 Hukum Newton II – Hukum Percepatan
-
-“Makin kuat dorongannya, makin ngebut geraknya!”
-
-Percepatan sebuah benda tergantung pada besar gaya dan massa benda tersebut.
-
-📌 Rumus keren:
-F = m × a
-
-🎯 Artinya:
-
-Dorong lebih kuat → benda bergerak lebih cepat
-
-Benda lebih berat → butuh gaya lebih besar
-
-Contoh:
-
-Dorong troli kosong lebih mudah daripada troli penuh 🛒
-
-🔴 Hukum Newton III – Aksi dan Reaksi
-
-“Setiap aksi pasti ada reaksi!”
-
-Jika kamu memberi gaya pada suatu benda, benda itu akan memberi gaya balik yang sama besar tapi berlawanan arah.
-
-💥 Contoh seru:
-
-Saat meloncat, kaki mendorong tanah ke bawah, tanah mendorong tubuhmu ke atas 🕴️
-
-Roket bisa terbang karena gas didorong ke bawah 🚀
-
-🎉 Kesimpulan
-
-Hukum Newton membantu kita memahami bagaimana dan kenapa benda bisa bergerak di sekitar kita. Dari hal sederhana sampai teknologi canggih, semuanya pakai aturan Newton!
-
-Belajar fisika ternyata nggak seseram itu, kan? 😄
-Yuk, terus eksplor dan temukan serunya sains! 🔬✨`;
+const MODEL_NAME = 'openai/gpt-oss-120b:free';
 
 export const fileToGenerativePart = async (file: File): Promise<{ inlineData: { data: string; mimeType: string } }> => {
-    return new Promise((resolve) => {
-        // Mock processing - just resolve immediately
-        resolve({
-            inlineData: {
-                data: "mock_base64_data",
-                mimeType: file.type
-            },
-        });
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const base64String = reader.result as string;
+            const base64Data = base64String.split(',')[1];
+            resolve({
+                inlineData: {
+                    data: base64Data,
+                    mimeType: file.type
+                },
+            });
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
     });
+};
+
+const getSystemInstruction = (subject: Subject): string => {
+    const isGeneral = subject === Subject.GENERAL;
+
+    let topicConstraint = "";
+    if (!isGeneral) {
+        topicConstraint = `
+    ⚠️ ATURAN VISUAL & TOPIK PENTING:
+    Kamu sedang berada di MODUL KHUSUS: ${subject}.
+    TUGASMU HANYA MENJAWAB PERTANYAAN TENTANG ${subject.toUpperCase()}.
+
+    Jika pengguna bertanya atau mengirim gambar tentang topik LAIN (misal lagi di Matematika tapi tanya Sejarah):
+    1. TOLAK dengan sopan, gaya bahasa gaul dan seru (fun).
+    2. JANGAN berikan jawaban soalnya.
+    3. Minta pengguna ganti kategori di menu atas.
+    
+    Contoh Penolakan Fun:
+    - "Waduh, aku lagi pakai kacamata ${subject} nih! 😎 Kalau mau tanya itu, ganti ke menu yang sesuai dulu ya!"
+    - "Eits, salah kamar nih! 🚪 Ini zona ${subject}, kalau mau bahas itu pindah dulu yuk!"
+    - "Duh aku bingung jawabnya kalau di kelas ${subject}. Coba ganti mapel dulu ya! ✨"
+    `;
+    }
+
+    return `Kamu adalah 'EduMind', tutor akademik ahli dan teman belajar yang ramah untuk siswa di Indonesia. Spesialisasimu adalah pelajaran ${subject}.
+  
+  ${topicConstraint}
+
+  Tujuan utamamu adalah membantu siswa MEMAHAMI materi, bukan hanya memberikan jawaban instan (kecuali diminta ringkasan).
+  
+  Pedoman:
+  1. Gunakan BAHASA INDONESIA yang baik, sopan, namun santai agar siswa merasa nyaman (seperti guru les privat yang asik).
+  2. Jika pengguna memberikan soal tugas, JANGAN langsung berikan jawaban akhir. Uraikan langkah-langkah penyelesaiannya (step-by-step) secara logis.
+  3. Jelaskan konsep 'mengapa' dan 'bagaimana' di balik jawaban tersebut.
+  4. Jika ada gambar soal, analisislah diagram, rumus, atau teks di dalam gambar tersebut dengan teliti.
+  5. Gunakan format yang rapi (bullet points, teks tebal untuk kata kunci).
+  6. Untuk Matematika/Sains, tulis rumus dengan jelas.
+  7. Berikan semangat positif di akhir penjelasan.`;
 };
 
 export const generateResponse = async (
@@ -71,8 +75,45 @@ export const generateResponse = async (
     imageBase64?: string,
     mimeType?: string
 ): Promise<string> => {
-    // Simulate network delay for realism
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+        {
+            role: "system",
+            content: getSystemInstruction(subject)
+        }
+    ];
 
-    return DUMMY_RESPONSE;
+    const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
+        { type: "text", text: prompt }
+    ];
+
+    if (imageBase64 && mimeType) {
+        if (MODEL_NAME === 'openai/gpt-oss-120b:free') {
+            console.warn("Model openai/gpt-oss-120b:free might not support image inputs.");
+        }
+        // Attempting to send image url with base64 as standard OpenAI vision format
+        userContent.push({
+            type: "image_url",
+            image_url: {
+                url: `data:${mimeType};base64,${imageBase64}`
+            }
+        });
+    }
+
+    messages.push({
+        role: "user",
+        content: userContent
+    });
+
+    try {
+        const completion = await client.chat.completions.create({
+            model: MODEL_NAME,
+            messages: messages,
+            temperature: 0.4,
+        });
+
+        return completion.choices[0]?.message?.content || "Maaf, saya tidak dapat menghasilkan respon saat ini. Silakan coba lagi.";
+    } catch (error: any) {
+        console.error("OpenRouter API Error:", error);
+        throw new Error(error.message || "Gagal berkomunikasi dengan AI.");
+    }
 };

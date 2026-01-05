@@ -20,6 +20,7 @@ export interface Message {
   text: string;
   image?: string; // Base64 string
   timestamp: number;
+  subject?: Subject;
   isError?: boolean;
 }
 

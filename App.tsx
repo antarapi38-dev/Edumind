@@ -1,107 +1,59 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Image as ImageIcon, X, Loader2, Sparkles, Backpack, Pencil, Eraser } from 'lucide-react';
-import { Subject, Message, Role } from './types';
 import ChatMessage from './components/ChatMessage';
-import SubjectSelector from './components/SubjectSelector';
+import { Subject, Message, Role, ChatState } from './types';
 import { generateResponse, fileToGenerativePart } from './services/openRouterService';
 
 const App: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'welcome',
-      role: Role.MODEL,
-      text: "Hai! Aku **EduMind**, teman belajarmu yang asik! 🎒\n\nAda PR Matematika, Sains, atau Sejarah yang bikin bingung? \n\n📸 **Foto soalnya** atau **ketik pertanyaanmu** di bawah. Jangan lupa pilih mapelnya ya biar aku makin pinter!",
-      timestamp: Date.now()
-    }
-  ]);
+  const [subject, setSubject] = useState<Subject>(Subject.GENERAL);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState<Subject>(Subject.GENERAL);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isLoading]);
-
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setSelectedImage(file);
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        setImagePreview(ev.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const clearImage = () => {
-    setSelectedImage(null);
-    setImagePreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
+  }, [messages]);
 
   const handleSend = async () => {
-    if ((!input.trim() && !selectedImage) || isLoading) return;
+    if (!input.trim()) return;
 
-    const userMessageId = Date.now().toString();
-    const timestamp = Date.now();
-    let base64Image = undefined;
-    let mimeType = undefined;
-
-    // Prepare User Message
-    if (selectedImage) {
-      const part = await fileToGenerativePart(selectedImage);
-      base64Image = part.inlineData.data;
-      mimeType = part.inlineData.mimeType;
-    }
-
-    const newUserMessage: Message = {
-      id: userMessageId,
+    const userMessage: Message = {
+      id: Date.now().toString(),
       role: Role.USER,
       text: input,
-      image: base64Image,
-      timestamp,
+      timestamp: Date.now(),
+      subject: subject
     };
 
-    setMessages(prev => [...prev, newUserMessage]);
+    setMessages(prev => [...prev, userMessage]);
     setInput('');
-    clearImage();
     setIsLoading(true);
 
     try {
-      const responseText = await generateResponse(
-        newUserMessage.text,
-        selectedSubject,
-        base64Image,
-        mimeType
-      );
+      const response = await generateResponse(input, subject);
 
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: Role.MODEL,
-        text: responseText,
+        text: response,
         timestamp: Date.now(),
+        subject: subject
       };
-      setMessages(prev => [...prev, botMessage]);
 
+      setMessages(prev => [...prev, botMessage]);
     } catch (error) {
+      console.error("Error generating response:", error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: Role.MODEL,
-        text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        timestamp: Date.now(),
-        isError: true
+        text: "Maaf, terjadi kesalahan. Silakan coba lagi.",
+        isError: true,
+        timestamp: Date.now()
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -109,159 +61,237 @@ const App: React.FC = () => {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Convert to base64 for display and sending
+    const imageData = await fileToGenerativePart(file);
+    const base64String = imageData.inlineData.data;
+    const mimeType = imageData.inlineData.mimeType;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: Role.USER,
+      text: "Mengirim gambar...",
+      image: base64String, // Store base64 for display in ChatMessage
+      timestamp: Date.now(),
+      subject: subject
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+
+    // Clear input
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    try {
+      const response = await generateResponse("Jelaskan gambar ini", subject, base64String, mimeType);
+
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: Role.MODEL,
+        text: response,
+        timestamp: Date.now(),
+        subject: subject
+      };
+
+      setMessages(prev => [...prev, botMessage]);
+    } catch (error) {
+      console.error("Error processing image:", error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: Role.MODEL,
+        text: "Maaf, gagal memproses gambar.",
+        isError: true,
+        timestamp: Date.now()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  const handleSubjectSelect = (newSubject: Subject) => {
+    setSubject(newSubject);
+    // Optional: Add a system message or toast indicating change?
+    // For now, just change state.
+  };
+
+  const subjectIcons: Record<string, string> = {
+    [Subject.GENERAL]: 'palette',
+    [Subject.MATH]: 'calculate',
+    [Subject.PHYSICS]: 'ink_pen',
+    [Subject.CHEMISTRY]: 'science',
+    [Subject.BIOLOGY]: 'biotech',
+    [Subject.HISTORY]: 'history_edu',
+    [Subject.LITERATURE]: 'menu_book',
+    [Subject.CODING]: 'computer', // Mapping Coding to computer icon
+  };
+
+  const subjectColors: Record<string, string> = {
+    [Subject.GENERAL]: 'group-hover:text-yellow-500',
+    [Subject.MATH]: 'group-hover:text-blue-500',
+    [Subject.PHYSICS]: 'group-hover:text-purple-500',
+    [Subject.CHEMISTRY]: 'group-hover:text-green-500',
+    [Subject.BIOLOGY]: 'group-hover:text-emerald-500',
+    [Subject.HISTORY]: 'group-hover:text-orange-500',
+    [Subject.LITERATURE]: 'group-hover:text-pink-500',
+    [Subject.CODING]: 'group-hover:text-blue-400',
+  };
+
+  const subjectActiveStyles: Record<string, string> = {
+    [Subject.GENERAL]: 'bg-yellow-400 text-white shadow-yellow-200 ring-yellow-200 border-yellow-300',
+    [Subject.MATH]: 'bg-blue-500 text-white shadow-blue-200 ring-blue-200 border-blue-300',
+    [Subject.PHYSICS]: 'bg-violet-500 text-white shadow-violet-200 ring-violet-200 border-violet-300',
+    [Subject.CHEMISTRY]: 'bg-green-500 text-white shadow-green-200 ring-green-200 border-green-300',
+    [Subject.BIOLOGY]: 'bg-emerald-500 text-white shadow-emerald-200 ring-emerald-200 border-emerald-300',
+    [Subject.HISTORY]: 'bg-orange-500 text-white shadow-orange-200 ring-orange-200 border-orange-300',
+    [Subject.LITERATURE]: 'bg-pink-500 text-white shadow-pink-200 ring-pink-200 border-pink-300',
+    [Subject.CODING]: 'bg-cyan-600 text-white shadow-cyan-200 ring-cyan-200 border-cyan-300',
+  };
+
   return (
-    <div className="flex flex-col h-screen bg-graph-paper font-display overflow-hidden selection:bg-pink-200">
+    <>
+      <div className="fixed inset-0 z-[-1] pointer-events-none dot-pattern opacity-60 dark:opacity-20"></div>
+      <div className="fixed top-0 left-0 w-full h-96 bg-gradient-to-b from-indigo-50/80 to-transparent dark:from-indigo-900/20 dark:to-transparent z-[-1] pointer-events-none"></div>
 
-      {/* Decorative Blobs */}
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-200/40 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob"></div>
-        <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-pink-200/40 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-2000"></div>
-        <div className="absolute bottom-[-20%] left-[20%] w-[50%] h-[50%] bg-yellow-200/40 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-4000"></div>
-      </div>
-
-      {/* Header Floating */}
-      <header className="flex-none pt-6 px-4 pb-2 z-20">
-        <div className="max-w-4xl mx-auto bg-white/80 backdrop-blur-xl border-2 border-white shadow-lg shadow-indigo-100/50 rounded-3xl px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-indigo-600 rounded-2xl rotate-[-6deg] flex items-center justify-center text-white shadow-lg ring-4 ring-indigo-50 border-2 border-indigo-400 transition-transform hover:rotate-0">
-              <Backpack size={24} strokeWidth={2.5} />
-            </div>
-            <div>
-              <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                EduMind <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-pink-500">AI</span>
-              </h1>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                <Sparkles size={10} className="text-yellow-500" />
-                Teman Belajar Pintar
-              </p>
-            </div>
+      <header className="w-full max-w-5xl bg-card-light dark:bg-card-dark rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700/50 p-3 md:p-4 flex justify-between items-center mb-6 md:mb-10 sticky top-4 z-40 backdrop-blur-xl bg-opacity-90 dark:bg-opacity-90">
+        <div className="flex items-center gap-3 md:gap-4 pl-2">
+          <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30">
+            <span className="material-symbols-rounded text-3xl">backpack</span>
           </div>
-          <div className="hidden sm:flex">
-            <div className="bg-gradient-to-r from-indigo-50 to-blue-50 px-4 py-2 rounded-xl border border-indigo-100 flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              <span className="text-xs font-bold text-indigo-900">Online</span>
+          <div className="flex flex-col">
+            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-800 dark:text-white">EduMind <span className="text-purple-500 bg-clip-text text-transparent bg-gradient-to-r from-purple-500 to-pink-500">AI</span></h1>
+            <div className="flex items-center gap-1.5 text-[0.65rem] md:text-xs font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-0.5">
+
+              Teman Belajar Pintar
             </div>
           </div>
         </div>
+
       </header>
 
-      {/* Main Chat Area */}
-      <main className="flex-1 overflow-hidden relative flex flex-col w-full max-w-4xl mx-auto z-10">
-
-        {/* Messages List */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-0 scroll-smooth">
-          {messages.map((msg) => (
-            <ChatMessage key={msg.id} message={msg} />
-          ))}
-
-          {isLoading && (
-            <div className="flex justify-start w-full mb-8 pl-4">
-              <div className="flex items-center gap-3 bg-white/90 backdrop-blur-sm px-5 py-4 rounded-[2rem] rounded-bl-none border-2 border-indigo-100 shadow-sm">
-                <Loader2 size={24} className="animate-spin text-indigo-500" />
-                <span className="text-sm font-bold text-indigo-400 animate-pulse">Sedang memecahkan masalah...</span>
+      <main className="w-full max-w-5xl flex-1 flex flex-col justify-start pb-4 relative z-10">
+        {/* Messages or Start Screen */}
+        {messages.length === 0 ? (
+          <div className="flex gap-3 md:gap-5 items-end mb-8 group animate-fade-in-up">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-secondary flex items-center justify-center text-white shadow-md shadow-emerald-100 dark:shadow-none mb-8 shrink-0 animate-float">
+              <span className="material-symbols-rounded text-2xl">smart_toy</span>
+            </div>
+            <div className="flex flex-col gap-2 max-w-3xl w-full">
+              <div className="bg-card-light dark:bg-card-dark p-6 md:p-10 rounded-t-[2.5rem] rounded-br-[2.5rem] rounded-bl-lg shadow-lg shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700 relative">
+                <span className="material-symbols-rounded absolute top-8 right-8 text-teal-100 dark:text-slate-700 text-4xl animate-pulse">auto_awesome</span>
+                <p className="text-lg md:text-2xl text-slate-700 dark:text-slate-200 mb-4 leading-relaxed font-semibold">
+                  Hai! Aku <span className="text-teal-500 font-extrabold">EduMind</span>, teman belajarmu yang asik! 🎒
+                </p>
+                <p className="text-lg md:text-2xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                  Ada PR Matematika, Sains, atau Sejarah yang bikin bingung?
+                </p>
+                <div className="mt-8 p-5 md:p-6 bg-slate-50 dark:bg-slate-800/60 rounded-3xl border border-slate-100 dark:border-slate-700">
+                  <p className="text-base md:text-xl text-slate-600 dark:text-slate-300 leading-relaxed">
+                    <button onClick={() => fileInputRef.current?.click()} className="inline-flex items-center align-middle font-bold text-slate-800 dark:text-white mr-2 bg-white dark:bg-slate-700 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-600 shadow-sm cursor-pointer hover:bg-slate-50 transition-colors transform active:scale-95">
+                      <span className="material-symbols-rounded text-lg mr-2 text-slate-700 dark:text-slate-200">photo_camera</span>
+                      Foto soalnya
+                    </button>
+                    {' '}atau{' '}
+                    <span className="font-extrabold text-teal-600 dark:text-teal-400">ketik pertanyaanmu</span>
+                    {' '}di bawah. Jangan lupa pilih mapelnya ya biar aku makin pinter!
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} className="h-4" />
-        </div>
-
-        {/* Input Area - Dock Style */}
-        <div className="flex-none p-4 md:p-6 pb-6">
-          <div className="bg-white border-2 border-indigo-50 rounded-[2.5rem] shadow-2xl shadow-indigo-200/40 p-3 relative transform transition-all hover:scale-[1.01]">
-
-            {/* Subject Selector */}
-            <div className="mb-3 px-1">
-              <SubjectSelector selectedSubject={selectedSubject} onSelect={setSelectedSubject} />
-            </div>
-
-            {/* Image Preview */}
-            {imagePreview && (
-              <div className="mx-4 mb-3 relative inline-block animate-in fade-in zoom-in duration-300">
-                <div className="relative group rotate-2 hover:rotate-0 transition-transform">
-                  <div className="absolute -inset-0.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-2xl blur opacity-30"></div>
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="relative h-28 w-auto rounded-xl border-4 border-white shadow-lg object-cover"
-                  />
-                  <button
-                    onClick={clearImage}
-                    className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-2 hover:bg-red-600 shadow-lg border-2 border-white transition-transform hover:scale-110"
-                  >
-                    <Eraser size={14} strokeWidth={3} />
-                  </button>
+              <span className="text-[0.7rem] font-bold text-slate-400 dark:text-slate-500 uppercase ml-4 tracking-wider flex items-center gap-1">
+                EduMind AI
+                <span className="w-1 h-1 bg-slate-300 rounded-full mx-1"></span>
+                Ready to help
+              </span>
+            </div >
+          </div >
+        ) : (
+          <div className="flex flex-col gap-4 mb-24 w-full">
+            {/* Added mb-24 to prevent overlap with fixed input */}
+            {messages.map((msg) => (
+              <ChatMessage key={msg.id} message={msg} />
+            ))}
+            {isLoading && (
+              <div className="flex justify-start w-full">
+                <div className="flex items-center gap-2 p-4 bg-white/50 dark:bg-slate-800/50 rounded-2xl">
+                  <div className="animate-bounce w-2 h-2 bg-primary rounded-full"></div>
+                  <div className="animate-bounce w-2 h-2 bg-secondary rounded-full delay-75"></div>
+                  <div className="animate-bounce w-2 h-2 bg-accent rounded-full delay-150"></div>
                 </div>
               </div>
             )}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
 
-            {/* Input Bar */}
-            <div className="flex items-end gap-3 bg-slate-50 rounded-[2rem] border-2 border-slate-100 focus-within:ring-4 focus-within:ring-indigo-100 focus-within:border-indigo-300 transition-all p-2 pr-2">
-              <button
+        {/* Subject Grid - Only show when no messages */}
+        {
+          messages.length === 0 && (
+            <div className="w-full max-w-5xl mb-8 -mt-4">
+              <div className="bg-card-light dark:bg-card-dark rounded-[2.5rem] p-4 md:p-6 shadow-xl shadow-slate-200/60 dark:shadow-none border border-slate-100 dark:border-slate-700">
+                <h3 className="text-lg md:text-xl font-extrabold text-slate-700 dark:text-slate-200 mb-4 text-center">Pilih mata pelajaranmu!</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 w-full justify-items-center">
+                  {Object.values(Subject).map((subj) => (
+                    <button
+                      key={subj}
+                      onClick={() => handleSubjectSelect(subj)}
+                      className={`w-full flex flex-col items-center justify-center p-3 md:p-4 rounded-3xl font-bold shrink-0 transition-all border 
+                        ${subject === subj ? (subjectActiveStyles[subj] + ' shadow-md ring-2') : 'bg-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-700 border-transparent hover:border-slate-200'}
+                        `}
+                    >
+                      <span className={`material-symbols-rounded text-3xl md:text-4xl mb-1 ${subject === subj ? '' : (subjectColors[subj] || 'group-hover:text-blue-500') + ' transition-colors'}`}>{subjectIcons[subj] || 'school'}</span>
+                      <span className="text-base md:text-lg">{subj}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )
+        }
+
+        {/* Input Area - Sticky Bottom */}
+        <div className={`w-full max-w-5xl ${messages.length > 0 ? 'fixed bottom-4 left-1/2 transform -translate-x-1/2 px-4' : 'mt-auto'} z-20`}>
+          <div className="bg-card-light dark:bg-card-dark rounded-[2.5rem] p-4 md:p-6 shadow-xl shadow-slate-200/60 dark:shadow-none border border-slate-100 dark:border-slate-700">
+            <div className="relative group">
+              <div
                 onClick={() => fileInputRef.current?.click()}
-                className="p-4 text-slate-400 hover:text-indigo-600 hover:bg-indigo-100 rounded-[1.5rem] transition-colors duration-200 group"
-                title="Unggah Foto Soal"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-primary dark:hover:text-primary cursor-pointer transition-colors p-3 rounded-2xl hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
               >
-                <ImageIcon size={24} strokeWidth={2.5} className="group-hover:scale-110 transition-transform" />
-              </button>
+                <span className="material-symbols-rounded text-[1.75rem] block">image</span>
+              </div>
               <input
                 type="file"
                 ref={fileInputRef}
-                onChange={handleImageSelect}
+                onChange={handleImageUpload}
                 accept="image/*"
                 className="hidden"
               />
-
-              <textarea
+              <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={`Ketik pertanyaan ${selectedSubject}...`}
-                className="flex-1 max-h-32 min-h-[3.5rem] py-4 bg-transparent border-none focus:ring-0 text-slate-700 placeholder-slate-400 resize-none text-base font-bold"
-                rows={1}
-                style={{ minHeight: '56px' }}
+                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                className="w-full bg-slate-50 dark:bg-slate-800/50 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 font-bold text-lg md:text-xl py-6 pl-16 pr-20 rounded-[2rem] border-2 border-transparent focus:border-indigo-100 dark:focus:border-indigo-900 focus:bg-white dark:focus:bg-slate-800 focus:ring-0 transition-all shadow-inner dark:shadow-none"
+                placeholder={`Ketik pertanyaan ${subject}...`}
+                type="text"
+                disabled={isLoading}
               />
-
               <button
                 onClick={handleSend}
-                disabled={(!input.trim() && !selectedImage) || isLoading}
-                className={`p-4 rounded-[1.5rem] flex items-center justify-center transition-all duration-300 transform ${(!input.trim() && !selectedImage) || isLoading
-                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                  : 'bg-gradient-to-br from-indigo-600 to-blue-600 text-white hover:shadow-xl hover:shadow-indigo-200 hover:-translate-y-1 active:scale-95'
-                  }`}
+                disabled={isLoading || !input.trim()}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-14 h-14 bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-400 rounded-full flex items-center justify-center hover:bg-primary hover:text-white dark:hover:bg-primary transition-all shadow-sm hover:shadow-lg hover:shadow-indigo-300 dark:hover:shadow-indigo-900/50 group-focus-within:bg-primary group-focus-within:text-white transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? <Loader2 size={24} className="animate-spin" /> : <Send size={24} strokeWidth={2.5} className="-ml-0.5 mt-0.5" />}
+                <span className="material-symbols-rounded text-2xl ml-1">send</span>
               </button>
             </div>
-
+          </div>
+          <div className={`text-center mt-6 ${messages.length > 0 ? 'hidden' : ''}`}>
+            <p className="text-[0.7rem] text-slate-400 dark:text-slate-600 font-bold uppercase tracking-widest opacity-70">Powered by EduMind Intelligence</p>
           </div>
         </div>
-      </main>
-
-      <style>{`
-        @keyframes blob {
-          0% { transform: translate(0px, 0px) scale(1); }
-          33% { transform: translate(30px, -50px) scale(1.1); }
-          66% { transform: translate(-20px, 20px) scale(0.9); }
-          100% { transform: translate(0px, 0px) scale(1); }
-        }
-        .animate-blob {
-          animation: blob 10s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-      `}</style>
-    </div>
+      </main >
+    </>
   );
 };
 
