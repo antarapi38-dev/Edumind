@@ -118,6 +118,11 @@ const App: React.FC = () => {
     // For now, just change state.
   };
 
+  const handleBack = () => {
+    setMessages([]);
+    setInput('');
+  };
+
   const subjectIcons: Record<string, string> = {
     [Subject.GENERAL]: 'palette',
     [Subject.MATH]: 'calculate',
@@ -158,6 +163,15 @@ const App: React.FC = () => {
 
       <header className="w-full max-w-5xl bg-card-light dark:bg-card-dark rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700/50 p-3 md:p-4 flex justify-between items-center mb-6 md:mb-10 sticky top-4 z-40 backdrop-blur-xl bg-opacity-90 dark:bg-opacity-90">
         <div className="flex items-center gap-3 md:gap-4 pl-2">
+          {messages.length > 0 && (
+            <button
+              onClick={handleBack}
+              className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-white dark:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 shadow-md shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 transition-all mr-1"
+              title="Kembali ke Beranda"
+            >
+              <span className="material-symbols-rounded text-2xl">arrow_back</span>
+            </button>
+          )}
           <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30">
             <span className="material-symbols-rounded text-3xl">backpack</span>
           </div>

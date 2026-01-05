@@ -11,7 +11,10 @@ const client = new OpenAI({
     dangerouslyAllowBrowser: true // Client-side usage
 });
 
-const MODEL_NAME = 'openai/gpt-oss-120b:free';
+const MODEL_NAME = 'z-ai/glm-4.5-air:free';
+
+// Debug: log if API key is present
+console.log("OpenRouter API Key present:", !!apiKey, apiKey ? `(${apiKey.substring(0, 10)}...)` : "(empty)");
 
 export const fileToGenerativePart = async (file: File): Promise<{ inlineData: { data: string; mimeType: string } }> => {
     return new Promise((resolve, reject) => {
@@ -87,8 +90,8 @@ export const generateResponse = async (
     ];
 
     if (imageBase64 && mimeType) {
-        if (MODEL_NAME === 'openai/gpt-oss-120b:free') {
-            console.warn("Model openai/gpt-oss-120b:free might not support image inputs.");
+        if (!MODEL_NAME.includes('vision') && !MODEL_NAME.includes('gemini')) {
+            console.warn("Current model might not support image inputs.");
         }
         // Attempting to send image url with base64 as standard OpenAI vision format
         userContent.push({
