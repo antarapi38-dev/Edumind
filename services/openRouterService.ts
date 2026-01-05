@@ -5,7 +5,7 @@ const SITE_URL = 'http://localhost:3000'; // Optional but recommended by OpenRou
 const SITE_NAME = 'EduMind AI'; // Optional but recommended by OpenRouter
 
 // Default model
-const MODEL_NAME = 'google/gemini-2.0-flash-001';
+const MODEL_NAME = 'deepseek/deepseek-chat'; // Testing with DeepSeek Free
 
 export const fileToGenerativePart = async (file: File): Promise<{ inlineData: { data: string; mimeType: string } }> => {
     return new Promise((resolve, reject) => {
@@ -97,7 +97,10 @@ export const generateResponse = async (
 
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.error?.message || `OpenRouter Error: ${response.statusText}`);
+            console.error("OpenRouter Full Error:", errorData); // Debug log
+            const msg = errorData.error?.message || response.statusText;
+            const code = errorData.error?.code || response.status;
+            throw new Error(`OpenRouter (${code}): ${msg}`);
         }
 
         const data = await response.json();
