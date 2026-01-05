@@ -1,44 +1,68 @@
 import { Subject } from "../types";
 
-const apiKey = process.env.OPENROUTER_API_KEY;
-const SITE_URL = 'http://localhost:3000'; // Optional but recommended by OpenRouter
-const SITE_NAME = 'EduMind AI'; // Optional but recommended by OpenRouter
+// MOCKED SERVICE - Returns dummy data as requested
+const DUMMY_RESPONSE = `Hukum Newton! Yuk, kita bahas dengan cara yang santai dan seru 🎉
 
-// Default model
-const MODEL_NAME = 'deepseek/deepseek-chat'; // Testing with DeepSeek Free
+🟢 Hukum Newton I – Hukum Kelembaman
+
+“Kalau nggak diganggu, ya tetap begitu.”
+
+Benda yang diam akan tetap diam, dan benda yang bergerak akan terus bergerak lurus dengan kecepatan yang sama, kecuali ada gaya yang memengaruhinya.
+
+✨ Contoh gampang:
+
+Bola yang diam di lantai nggak akan bergerak kalau nggak ditendang ⚽
+
+Penumpang terasa terdorong ke depan saat mobil direm mendadak 🚗💨
+
+🔵 Hukum Newton II – Hukum Percepatan
+
+“Makin kuat dorongannya, makin ngebut geraknya!”
+
+Percepatan sebuah benda tergantung pada besar gaya dan massa benda tersebut.
+
+📌 Rumus keren:
+F = m × a
+
+🎯 Artinya:
+
+Dorong lebih kuat → benda bergerak lebih cepat
+
+Benda lebih berat → butuh gaya lebih besar
+
+Contoh:
+
+Dorong troli kosong lebih mudah daripada troli penuh 🛒
+
+🔴 Hukum Newton III – Aksi dan Reaksi
+
+“Setiap aksi pasti ada reaksi!”
+
+Jika kamu memberi gaya pada suatu benda, benda itu akan memberi gaya balik yang sama besar tapi berlawanan arah.
+
+💥 Contoh seru:
+
+Saat meloncat, kaki mendorong tanah ke bawah, tanah mendorong tubuhmu ke atas 🕴️
+
+Roket bisa terbang karena gas didorong ke bawah 🚀
+
+🎉 Kesimpulan
+
+Hukum Newton membantu kita memahami bagaimana dan kenapa benda bisa bergerak di sekitar kita. Dari hal sederhana sampai teknologi canggih, semuanya pakai aturan Newton!
+
+Belajar fisika ternyata nggak seseram itu, kan? 😄
+Yuk, terus eksplor dan temukan serunya sains! 🔬✨`;
 
 export const fileToGenerativePart = async (file: File): Promise<{ inlineData: { data: string; mimeType: string } }> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            const base64String = reader.result as string;
-            // Remove data URL prefix (e.g. "data:image/jpeg;base64,")
-            const base64Data = base64String.split(',')[1];
-            resolve({
-                inlineData: {
-                    data: base64Data, // Keep consistent with existing interface
-                    mimeType: file.type
-                },
-            });
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
+    return new Promise((resolve) => {
+        // Mock processing - just resolve immediately
+        resolve({
+            inlineData: {
+                data: "mock_base64_data",
+                mimeType: file.type
+            },
+        });
     });
-};
-
-const getSystemInstruction = (subject: Subject): string => {
-    return `Kamu adalah 'EduMind', tutor akademik ahli dan teman belajar yang ramah untuk siswa di Indonesia. Spesialisasimu adalah pelajaran ${subject}.
-  
-  Tujuan utamamu adalah membantu siswa MEMAHAMI materi, bukan hanya memberikan jawaban instan (kecuali diminta ringkasan).
-  
-  Pedoman:
-  1. Gunakan BAHASA INDONESIA yang baik, sopan, namun santai agar siswa merasa nyaman.
-  2. Jika pengguna memberikan soal tugas, JANGAN langsung berikan jawaban akhir. Uraikan langkah-langkah penyelesaiannya (step-by-step).
-  3. Jelaskan konsep 'mengapa' dan 'bagaimana'.
-  4. Jika ada gambar soal, analisislah dengan teliti.
-  5. Gunakan format yang rapi (markdown).
-  6. Untuk Matematika/Sains, tulis rumus dengan jelas (LaTeX jika memungkinkan, atau teks biasa yang jelas).
-  7. Berikan semangat positif.`;
 };
 
 export const generateResponse = async (
@@ -47,67 +71,8 @@ export const generateResponse = async (
     imageBase64?: string,
     mimeType?: string
 ): Promise<string> => {
-    if (!apiKey) {
-        throw new Error("OpenRouter API Key is missing. Please check vite.config.ts");
-    }
+    // Simulate network delay for realism
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
-    const messages: any[] = [
-        {
-            role: "system",
-            content: getSystemInstruction(subject)
-        }
-    ];
-
-    const userContent: any[] = [
-        {
-            type: "text",
-            text: prompt
-        }
-    ];
-
-    if (imageBase64 && mimeType) {
-        userContent.push({
-            type: "image_url",
-            image_url: {
-                url: `data:${mimeType};base64,${imageBase64}`
-            }
-        });
-    }
-
-    messages.push({
-        role: "user",
-        content: userContent
-    });
-
-    try {
-        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${apiKey}`,
-                "HTTP-Referer": SITE_URL,
-                "X-Title": SITE_NAME,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                model: MODEL_NAME,
-                messages: messages,
-                temperature: 0.4,
-            })
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error("OpenRouter Full Error:", errorData); // Debug log
-            const msg = errorData.error?.message || response.statusText;
-            const code = errorData.error?.code || response.status;
-            throw new Error(`OpenRouter (${code}): ${msg}`);
-        }
-
-        const data = await response.json();
-        return data.choices[0]?.message?.content || "Maaf, tidak ada respon.";
-
-    } catch (error: any) {
-        console.error("OpenRouter API Error:", error);
-        throw new Error(error.message || "Gagal berkomunikasi dengan OpenRouter.");
-    }
+    return DUMMY_RESPONSE;
 };
